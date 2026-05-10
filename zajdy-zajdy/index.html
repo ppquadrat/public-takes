@@ -88,14 +88,6 @@
         font-size: 1.05rem;
       }
 
-      .preset-row {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-        padding: 12px 18px;
-        border-bottom: 1px solid var(--line);
-      }
-
       .time {
         font-variant-numeric: tabular-nums;
         color: var(--muted);
@@ -234,7 +226,6 @@
           <div class="time" id="timeReadout">0:00 / 0:00</div>
           <input class="timeline" id="timeline" aria-label="Timeline" type="range" min="0" max="1" step="0.1" value="0">
         </div>
-        <div class="preset-row" id="presetRow" aria-label="Mixer presets"></div>
         <p class="error" id="error"></p>
         <div class="tracks" id="tracks"></div>
       </section>
@@ -249,6 +240,7 @@
                 "src": "audio/iryna.m4a",
                 "offsetMs": 0,
                 "gainDb": -2.53,
+                "initialVolume": 0.55,
                 "bytes": 4128626
         },
         {
@@ -258,6 +250,7 @@
                 "src": "audio/polina.m4a",
                 "offsetMs": -1660,
                 "gainDb": -7.09,
+                "initialVolume": 1,
                 "bytes": 4166007
         },
         {
@@ -267,6 +260,7 @@
                 "src": "audio/veronika.m4a",
                 "offsetMs": -2040,
                 "gainDb": 0.71,
+                "initialVolume": 1,
                 "bytes": 4167436
         },
         {
@@ -276,15 +270,10 @@
                 "src": "audio/tenor-yulia.m4a",
                 "offsetMs": -540,
                 "gainDb": -3.05,
+                "initialVolume": 1,
                 "bytes": 4153581
         }
 ];
-      const presets = [
-        { name: "Full mix", solo: [], muted: [] },
-        ...tracks.map((track) => ({ name: track.displayName, solo: [track.id], muted: [] })),
-        { name: "No reference", solo: [], muted: tracks.length ? [tracks[0].id] : [] }
-      ];
-
       const state = {
         isPlaying: false,
         positionSec: 0,
@@ -294,7 +283,7 @@
         animationFrame: null,
         muted: Object.fromEntries(tracks.map((track) => [track.id, false])),
         solo: new Set(),
-        volume: Object.fromEntries(tracks.map((track) => [track.id, 1])),
+        volume: Object.fromEntries(tracks.map((track) => [track.id, track.initialVolume ?? 1])),
         audioById: {}
       };
 
@@ -303,7 +292,6 @@
       const timeReadout = document.getElementById("timeReadout");
       const tracksEl = document.getElementById("tracks");
       const errorEl = document.getElementById("error");
-      const presetRow = document.getElementById("presetRow");
 
       function dbToLinear(db) {
         return Math.pow(10, db / 20);
@@ -543,24 +531,7 @@
         await Promise.allSettled(playPromises);
       }
 
-      function applyPreset(preset) {
-        state.solo = new Set(preset.solo);
-        state.muted = Object.fromEntries(tracks.map((track) => [track.id, preset.muted.includes(track.id)]));
-        applyVolumes();
-      }
-
-      function renderPresets() {
-        presets.forEach((preset) => {
-          const button = document.createElement("button");
-          button.type = "button";
-          button.textContent = preset.name;
-          button.addEventListener("click", () => applyPreset(preset));
-          presetRow.appendChild(button);
-        });
-      }
-
       function render() {
-        renderPresets();
         tracks.forEach((track) => {
           const row = document.createElement("div");
           row.className = "track";
@@ -574,7 +545,7 @@
             <div class="controls">
               <button class="toggle mute" type="button" aria-label="Mute ${track.displayName}">M</button>
               <button class="toggle solo" type="button" aria-label="Solo ${track.displayName}">S</button>
-              <input class="volume" aria-label="${track.displayName} volume" type="range" min="0" max="1" step="0.01" value="1">
+              <input class="volume" aria-label="${track.displayName} volume" type="range" min="0" max="1" step="0.01" value="${track.initialVolume ?? 1}">
             </div>
           `;
 
