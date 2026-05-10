@@ -1,0 +1,657 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Корабелъ2</title>
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f7f4ef;
+        --ink: #1f2426;
+        --muted: #667174;
+        --line: #d9d2c8;
+        --panel: #ffffff;
+        --accent: #1f6f78;
+        --accent-strong: #15535b;
+        --warn: #8a2d1f;
+        --bar: #b9c7b8;
+        --bar-strong: #557f78;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+
+      main {
+        width: min(1120px, calc(100vw - 32px));
+        margin: 0 auto;
+        padding: 32px 0 48px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: clamp(2rem, 4vw, 3.4rem);
+        line-height: 1.02;
+        letter-spacing: 0;
+      }
+
+      .small {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+
+      .player {
+        margin-top: 22px;
+        border: 1px solid var(--line);
+        background: var(--panel);
+        box-shadow: 0 20px 60px rgb(31 36 38 / 0.08);
+      }
+
+      .transport {
+        display: grid;
+        grid-template-columns: 52px minmax(92px, max-content) 1fr;
+        gap: 14px;
+        align-items: center;
+        padding: 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      button {
+        min-height: 40px;
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+        cursor: pointer;
+      }
+
+      button:hover { border-color: var(--accent); }
+
+      button.is-active,
+      .play {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+      }
+
+      .play {
+        width: 52px;
+        height: 44px;
+        font-size: 1.05rem;
+      }
+
+      .preset-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 18px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .time {
+        font-variant-numeric: tabular-nums;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      input[type="range"] {
+        width: 100%;
+        accent-color: var(--accent);
+      }
+
+      .error {
+        display: none;
+        margin: 0;
+        padding: 12px 18px;
+        color: var(--warn);
+        border-bottom: 1px solid var(--line);
+      }
+
+      .tracks { position: relative; }
+
+      .track {
+        display: grid;
+        grid-template-columns: minmax(230px, 300px) 1fr;
+        border-bottom: 1px solid var(--line);
+        min-height: 96px;
+      }
+
+      .track:last-child { border-bottom: 0; }
+
+      .track-meta {
+        padding: 16px 18px;
+        border-right: 1px solid var(--line);
+      }
+
+      .track-name {
+        font-weight: 700;
+        margin-bottom: 3px;
+      }
+
+      .controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .toggle {
+        width: 40px;
+        min-height: 34px;
+        font-weight: 700;
+      }
+
+      .volume { max-width: 130px; }
+
+      .lane {
+        position: relative;
+        min-height: 96px;
+        padding: 16px;
+        overflow: hidden;
+      }
+
+      .lane-playhead {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        left: 0%;
+        width: 2px;
+        background: var(--accent-strong);
+        pointer-events: none;
+        z-index: 2;
+      }
+
+      .bars {
+        height: 64px;
+        display: grid;
+        grid-template-columns: repeat(96, 1fr);
+        gap: 3px;
+        align-items: center;
+      }
+
+      .bars span {
+        display: block;
+        min-height: 4px;
+        border-radius: 999px;
+        background: var(--bar);
+      }
+
+      .track:nth-child(2n) .bars span { background: #c4b9ca; }
+      .track:nth-child(3n) .bars span { background: #c5bea3; }
+
+      .track.is-solo .bars span,
+      .track:not(.is-muted) .bars span:hover {
+        background: var(--bar-strong);
+      }
+
+      .track.is-muted { opacity: 0.52; }
+
+      audio { display: none; }
+
+      @media (max-width: 760px) {
+        main {
+          width: min(100vw - 20px, 1120px);
+          padding-top: 22px;
+        }
+
+        .transport { grid-template-columns: 52px 1fr; }
+        .timeline { grid-column: 1 / -1; }
+        .track { grid-template-columns: 1fr; }
+
+        .track-meta {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .lane {
+          min-height: 76px;
+          padding-top: 12px;
+        }
+
+        .bars {
+          height: 48px;
+          gap: 2px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Корабелъ2</h1>
+      <p class="small">Published static mix player. Use headphones for the best sync.</p>
+
+      <section class="player" aria-label="Multitrack player">
+        <div class="transport">
+          <button class="play" id="playButton" type="button" aria-label="Start playback">▶</button>
+          <div class="time" id="timeReadout">0:00 / 0:00</div>
+          <input class="timeline" id="timeline" aria-label="Timeline" type="range" min="0" max="1" step="0.1" value="0">
+        </div>
+        <div class="preset-row" id="presetRow" aria-label="Mixer presets"></div>
+        <p class="error" id="error"></p>
+        <div class="tracks" id="tracks"></div>
+      </section>
+    </main>
+
+    <script>
+      const tracks = [
+        {
+                "id": "fcaf396f-1dee-47a9-aa1c-ab14aabe2120",
+                "displayName": "Пика",
+                "uploadedBy": "Пика",
+                "src": "audio/1.m4a",
+                "offsetMs": 0,
+                "gainDb": -2.57,
+                "bytes": 4335973
+        },
+        {
+                "id": "c12a23ae-ddd4-4112-a2aa-53bfb013def5",
+                "displayName": "Olga",
+                "uploadedBy": "Olga",
+                "src": "audio/2-olga.m4a",
+                "offsetMs": -6860,
+                "gainDb": -6.87,
+                "bytes": 4333432
+        },
+        {
+                "id": "c862dfbd-1047-4de1-900a-80b531ecd8a1",
+                "displayName": "полина",
+                "uploadedBy": "полина",
+                "src": "audio/3.m4a",
+                "offsetMs": -2100,
+                "gainDb": -6.66,
+                "bytes": 4256194
+        },
+        {
+                "id": "d1428736-be9e-4f52-9926-05365ef502dd",
+                "displayName": "Люсиль",
+                "uploadedBy": "Люсиль",
+                "src": "audio/4.m4a",
+                "offsetMs": -2560,
+                "gainDb": -4.14,
+                "bytes": 4243614
+        },
+        {
+                "id": "50fe0f40-b32d-47f6-b5ad-4316be812bad",
+                "displayName": "СашаН",
+                "uploadedBy": "СашаН",
+                "src": "audio/5.m4a",
+                "offsetMs": -7520,
+                "gainDb": -5.18,
+                "bytes": 4328192
+        }
+];
+      const presets = [
+        { name: "Full mix", solo: [], muted: [] },
+        ...tracks.map((track) => ({ name: track.displayName, solo: [track.id], muted: [] })),
+        { name: "No reference", solo: [], muted: tracks.length ? [tracks[0].id] : [] }
+      ];
+
+      const state = {
+        isPlaying: false,
+        positionSec: 0,
+        durationSec: 0,
+        anchorPositionSec: 0,
+        anchorTimeMs: 0,
+        animationFrame: null,
+        muted: Object.fromEntries(tracks.map((track) => [track.id, false])),
+        solo: new Set(),
+        volume: Object.fromEntries(tracks.map((track) => [track.id, 1])),
+        audioById: {}
+      };
+
+      const playButton = document.getElementById("playButton");
+      const timeline = document.getElementById("timeline");
+      const timeReadout = document.getElementById("timeReadout");
+      const tracksEl = document.getElementById("tracks");
+      const errorEl = document.getElementById("error");
+      const presetRow = document.getElementById("presetRow");
+
+      function dbToLinear(db) {
+        return Math.pow(10, db / 20);
+      }
+
+      function formatTime(seconds) {
+        if (!Number.isFinite(seconds)) return "0:00";
+        const minutes = Math.floor(seconds / 60);
+        const remaining = String(Math.floor(seconds % 60)).padStart(2, "0");
+        return `${minutes}:${remaining}`;
+      }
+
+      function waveformBars(trackId) {
+        let seed = 0;
+        for (const char of trackId) seed = (seed * 31 + char.charCodeAt(0)) % 9973;
+        return Array.from({ length: 96 }, (_, index) => {
+          seed = (seed * 73 + index * 19 + 37) % 9973;
+          const contour = 0.45 + 0.35 * Math.sin(index / 5) + 0.2 * Math.sin(index / 13);
+          return Math.max(0.14, Math.min(1, contour * (0.55 + seed / 9973)));
+        });
+      }
+
+      function localTime(track, transportPositionSec) {
+        return transportPositionSec - track.offsetMs / 1000;
+      }
+
+      function isPlayable(audio, seconds) {
+        return seconds >= 0 && (!Number.isFinite(audio.duration) || seconds < audio.duration);
+      }
+
+      function isTrackAudible(track) {
+        const soloMode = state.solo.size > 0;
+        return !state.muted[track.id] && (!soloMode || state.solo.has(track.id));
+      }
+
+      function setError(message) {
+        errorEl.textContent = message;
+        errorEl.style.display = message ? "block" : "none";
+      }
+
+      function waitForReady(audio, track) {
+        if (audio.readyState >= HTMLMediaElement.HAVE_FUTURE_DATA) {
+          return Promise.resolve();
+        }
+
+        audio.load();
+        return new Promise((resolve, reject) => {
+          const timeout = window.setTimeout(() => {
+            cleanup();
+            reject(new Error(`${track.displayName} is still buffering. Try again in a moment.`));
+          }, 15000);
+
+          function cleanup() {
+            window.clearTimeout(timeout);
+            audio.removeEventListener("canplay", onReady);
+            audio.removeEventListener("canplaythrough", onReady);
+            audio.removeEventListener("error", onError);
+          }
+
+          function onReady() {
+            cleanup();
+            resolve();
+          }
+
+          function onError() {
+            cleanup();
+            reject(new Error(`Could not load audio for ${track.displayName}.`));
+          }
+
+          audio.addEventListener("canplay", onReady);
+          audio.addEventListener("canplaythrough", onReady);
+          audio.addEventListener("error", onError);
+        });
+      }
+
+      async function waitForAudibleTracks(startPositionSec) {
+        const audibleTracks = tracks.filter((track) => {
+          const audio = state.audioById[track.id];
+          return audio && isTrackAudible(track) && isPlayable(audio, localTime(track, startPositionSec));
+        });
+
+        await Promise.all(audibleTracks.map((track) => waitForReady(state.audioById[track.id], track)));
+      }
+
+      function applyVolumes() {
+        const soloMode = state.solo.size > 0;
+        tracks.forEach((track) => {
+          const audio = state.audioById[track.id];
+          const row = document.querySelector(`[data-track-id="${track.id}"]`);
+          if (!audio || !row) return;
+          const audibleBySolo = !soloMode || state.solo.has(track.id);
+          const shouldMute = state.muted[track.id] || !audibleBySolo;
+          const gain = dbToLinear(track.gainDb);
+          audio.volume = shouldMute ? 0 : Math.max(0, Math.min(1, state.volume[track.id] * gain));
+          row.classList.toggle("is-muted", Boolean(state.muted[track.id] || (soloMode && !state.solo.has(track.id))));
+          row.classList.toggle("is-solo", state.solo.has(track.id));
+          row.querySelector(".mute").classList.toggle("is-active", state.muted[track.id]);
+          row.querySelector(".solo").classList.toggle("is-active", state.solo.has(track.id));
+          row.querySelector(".mute").setAttribute("aria-pressed", String(state.muted[track.id]));
+          row.querySelector(".solo").setAttribute("aria-pressed", String(state.solo.has(track.id)));
+        });
+      }
+
+      function refreshDuration() {
+        const nextDuration = tracks.reduce((max, track) => {
+          const audio = state.audioById[track.id];
+          if (!audio || !Number.isFinite(audio.duration)) return max;
+          return Math.max(max, audio.duration + track.offsetMs / 1000);
+        }, 0);
+        if (nextDuration > 0) {
+          state.durationSec = nextDuration;
+          timeline.max = String(Math.max(nextDuration, 1));
+          updateReadout();
+        }
+      }
+
+      function updateReadout() {
+        timeReadout.textContent = `${formatTime(state.positionSec)} / ${formatTime(state.durationSec)}`;
+        timeline.value = String(Math.min(state.positionSec, state.durationSec || state.positionSec));
+        const pct = state.durationSec > 0 ? Math.max(0, Math.min(100, state.positionSec / state.durationSec * 100)) : 0;
+        document.querySelectorAll(".lane-playhead").forEach((item) => {
+          item.style.left = `${pct}%`;
+        });
+      }
+
+      function setTransportPosition(nextPositionSec) {
+        const clamped = Math.max(0, Math.min(nextPositionSec, state.durationSec || nextPositionSec));
+        state.positionSec = clamped;
+        state.anchorPositionSec = clamped;
+        state.anchorTimeMs = performance.now();
+        tracks.forEach((track) => {
+          const audio = state.audioById[track.id];
+          if (!audio) return;
+          const nextLocalTime = localTime(track, clamped);
+          if (nextLocalTime < 0) {
+            audio.pause();
+            audio.currentTime = 0;
+          } else if (isPlayable(audio, nextLocalTime)) {
+            audio.currentTime = nextLocalTime;
+          } else {
+            audio.pause();
+          }
+        });
+        updateReadout();
+      }
+
+      function stopPlayback(reset = false) {
+        state.isPlaying = false;
+        playButton.textContent = "▶";
+        playButton.disabled = false;
+        playButton.setAttribute("aria-label", "Start playback");
+        if (state.animationFrame) {
+          cancelAnimationFrame(state.animationFrame);
+          state.animationFrame = null;
+        }
+        tracks.forEach((track) => {
+          const audio = state.audioById[track.id];
+          if (audio) audio.pause();
+        });
+        if (reset) setTransportPosition(0);
+      }
+
+      function tick() {
+        state.positionSec = state.anchorPositionSec + (performance.now() - state.anchorTimeMs) / 1000;
+        if (state.durationSec > 0 && state.positionSec >= state.durationSec) {
+          stopPlayback(true);
+          return;
+        }
+        updateReadout();
+        tracks.forEach((track) => {
+          const audio = state.audioById[track.id];
+          if (!audio) return;
+          const nextLocalTime = localTime(track, state.positionSec);
+          if (nextLocalTime < 0 || !isPlayable(audio, nextLocalTime)) {
+            audio.pause();
+          } else if (state.isPlaying && audio.paused) {
+            audio.currentTime = nextLocalTime;
+            audio.play().catch((error) => {
+              setError(`${track.displayName}: ${error.message || "Playback failed"}`);
+              stopPlayback(false);
+            });
+          }
+        });
+        state.animationFrame = requestAnimationFrame(tick);
+      }
+
+      async function startPlayback() {
+        setError("");
+        refreshDuration();
+        if (state.durationSec > 0 && state.positionSec >= state.durationSec - 0.05) {
+          setTransportPosition(0);
+        }
+        applyVolumes();
+
+        playButton.disabled = true;
+        playButton.textContent = "…";
+        try {
+          await waitForAudibleTracks(state.positionSec);
+        } catch (error) {
+          setError(error.message || "Audio is still buffering.");
+          playButton.disabled = false;
+          playButton.textContent = "▶";
+          return;
+        }
+
+        let startedAny = false;
+        const playPromises = [];
+        for (const track of tracks) {
+          const audio = state.audioById[track.id];
+          if (!audio || !isTrackAudible(track)) continue;
+          const nextLocalTime = localTime(track, state.positionSec);
+          if (!isPlayable(audio, nextLocalTime)) continue;
+          if (Math.abs(audio.currentTime - nextLocalTime) > 0.35) {
+            audio.currentTime = nextLocalTime;
+          }
+          startedAny = true;
+          playPromises.push(audio.play().catch((error) => {
+            setError(`${track.displayName}: ${error.message || "Playback failed"}`);
+            stopPlayback(false);
+          }));
+        }
+
+        if (!startedAny) {
+          setError("No playable tracks at this position.");
+          playButton.disabled = false;
+          playButton.textContent = "▶";
+          return;
+        }
+
+        state.anchorPositionSec = state.positionSec;
+        state.anchorTimeMs = performance.now();
+        state.isPlaying = true;
+        playButton.disabled = false;
+        playButton.textContent = "■";
+        playButton.setAttribute("aria-label", "Stop playback");
+        tick();
+        await Promise.allSettled(playPromises);
+      }
+
+      function applyPreset(preset) {
+        state.solo = new Set(preset.solo);
+        state.muted = Object.fromEntries(tracks.map((track) => [track.id, preset.muted.includes(track.id)]));
+        applyVolumes();
+      }
+
+      function renderPresets() {
+        presets.forEach((preset) => {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.textContent = preset.name;
+          button.addEventListener("click", () => applyPreset(preset));
+          presetRow.appendChild(button);
+        });
+      }
+
+      function render() {
+        renderPresets();
+        tracks.forEach((track) => {
+          const row = document.createElement("div");
+          row.className = "track";
+          row.dataset.trackId = track.id;
+
+          const meta = document.createElement("div");
+          meta.className = "track-meta";
+          meta.innerHTML = `
+            <div class="track-name">${track.displayName}</div>
+            <div class="small">by ${track.uploadedBy}</div>
+            <div class="controls">
+              <button class="toggle mute" type="button" aria-label="Mute ${track.displayName}">M</button>
+              <button class="toggle solo" type="button" aria-label="Solo ${track.displayName}">S</button>
+              <input class="volume" aria-label="${track.displayName} volume" type="range" min="0" max="1" step="0.01" value="1">
+            </div>
+          `;
+
+          const lane = document.createElement("div");
+          lane.className = "lane";
+          const lanePlayhead = document.createElement("div");
+          lanePlayhead.className = "lane-playhead";
+          lanePlayhead.setAttribute("aria-hidden", "true");
+          const bars = document.createElement("div");
+          bars.className = "bars";
+          waveformBars(track.id).forEach((height) => {
+            const bar = document.createElement("span");
+            bar.style.height = `${Math.round(height * 100)}%`;
+            bars.appendChild(bar);
+          });
+          lane.append(lanePlayhead, bars);
+
+          const audio = document.createElement("audio");
+          audio.preload = "auto";
+          audio.src = track.src;
+          audio.addEventListener("loadedmetadata", refreshDuration);
+          audio.addEventListener("error", () => {
+            setError(`Could not load audio for ${track.displayName}.`);
+            stopPlayback(false);
+          });
+          state.audioById[track.id] = audio;
+
+          meta.querySelector(".mute").addEventListener("click", () => {
+            state.muted[track.id] = !state.muted[track.id];
+            applyVolumes();
+          });
+
+          meta.querySelector(".solo").addEventListener("click", () => {
+            if (state.solo.has(track.id)) {
+              state.solo.delete(track.id);
+            } else {
+              state.solo.add(track.id);
+            }
+            applyVolumes();
+          });
+
+          meta.querySelector(".volume").addEventListener("input", (event) => {
+            state.volume[track.id] = Number(event.currentTarget.value);
+            applyVolumes();
+          });
+
+          row.append(meta, lane, audio);
+          tracksEl.appendChild(row);
+        });
+
+        applyVolumes();
+        updateReadout();
+      }
+
+      playButton.addEventListener("click", () => {
+        if (state.isPlaying) {
+          stopPlayback(true);
+        } else {
+          startPlayback();
+        }
+      });
+
+      timeline.addEventListener("input", (event) => {
+        setError("");
+        setTransportPosition(Number(event.currentTarget.value));
+      });
+
+      render();
+    </script>
+  </body>
+</html>
