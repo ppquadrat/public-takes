@@ -116,6 +116,10 @@
       }
 
       .playhead {
+        display: none;
+      }
+
+      .lane-playhead {
         position: absolute;
         top: 0;
         bottom: 0;
@@ -383,6 +387,9 @@
         timeline.value = String(Math.min(state.positionSec, state.durationSec || state.positionSec));
         const pct = state.durationSec > 0 ? Math.max(0, Math.min(100, state.positionSec / state.durationSec * 100)) : 0;
         playhead.style.left = `${pct}%`;
+        document.querySelectorAll(".lane-playhead").forEach((item) => {
+          item.style.left = `${pct}%`;
+        });
       }
 
       function setTransportPosition(nextPositionSec) {
@@ -504,6 +511,9 @@
 
           const lane = document.createElement("div");
           lane.className = "lane";
+          const lanePlayhead = document.createElement("div");
+          lanePlayhead.className = "lane-playhead";
+          lanePlayhead.setAttribute("aria-hidden", "true");
           const bars = document.createElement("div");
           bars.className = "bars";
           waveformBars(track.id).forEach((height) => {
@@ -511,7 +521,7 @@
             bar.style.height = `${Math.round(height * 100)}%`;
             bars.appendChild(bar);
           });
-          lane.appendChild(bars);
+          lane.append(lanePlayhead, bars);
 
           const audio = document.createElement("audio");
           audio.preload = "metadata";
